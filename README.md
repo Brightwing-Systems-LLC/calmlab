@@ -14,8 +14,9 @@ git clone https://github.com/Brightwing-Systems-LLC/calmlab && cd calmlab
 ```
 
 Recording doesn't need `./start`. A hook writes to a local database whenever Claude Code
-fires it; `./start` only opens the view. Sessions already open when you run setup are
-recorded once you restart them.
+fires it; `./start` only opens the view. Sessions already open when you run setup usually
+start recording right away, because Claude Code picks up the new hooks; restart one if
+`uv run calmlab status` doesn't move.
 
 Want to look first? `uv run calmlab demo` opens the view on eight weeks of made-up data and
 leaves yours alone.

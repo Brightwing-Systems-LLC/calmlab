@@ -70,7 +70,8 @@ def cmd_setup(args) -> int:
     install.install(settings, out=lambda s: print("  " + s))
     with store.connect() as conn:
         store.set_meta(conn, "settings_path", str(settings))
-    print("\nDone. Claude Code sessions you start from now on are recorded.")
+    print("\nDone. Claude Code sessions are recorded from now on, usually including ones already open.")
+    print("If `uv run calmlab status` doesn't count up as you work, restart that session.")
     print("Run ./start to open CalmLab.")
     return 0
 
