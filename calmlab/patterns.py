@@ -11,7 +11,7 @@ import math
 import statistics
 from datetime import date, timedelta
 
-from .findings import MIN_GROUP_DAYS, duration
+from .findings import MEASURES, MIN_GROUP_DAYS, Measure, duration, split
 
 RANGES = {"14": ("2 weeks", 14), "56": ("8 weeks", 56), "all": ("All", None)}
 DEFAULT_RANGE = "56"
@@ -22,55 +22,17 @@ WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 WEEKDAY_NAMES = ("Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays")
 
 
-def _minutes(v):
-    return duration(v * 60)
-
-
-def _one(v):
-    return f"{v:.1f}"
-
-
-def _hours(v):
-    return f"{v:.1f}h"
-
-
-def _int(v):
-    return f"{v:.0f}"
-
-
-def _tick_minutes(v):
-    return f"{v / 60:g}m"
-
-
-def _tick_hours(v):
-    return f"{v / 60:g}h"
-
-
-def _tick_plain(v):
-    return f"{v:g}"
-
-
-# key: (picker label, axis label, how a value reads, the "days with ..." phrase, tick unit, tick label)
-X_METRICS = {
-    "parallel_starts": ("Parallel starts", "Parallel starts that day", _int, "{} or more parallel starts", 1, _tick_plain),
-    "mean_concurrency": ("Agents at once", "Agents at once, while busy", _one, "{} or more agents busy at once", 1, _tick_plain),
-    "day_length_h": ("Day length", "Hours from first to last prompt", _hours, "{} or more of work", 1, lambda v: f"{v:g}h"),
-    "longest_stretch_min": ("Focus stretch", "Longest focus stretch", _minutes, "a focus stretch of {} or more", 60, _tick_hours),
-    "median_wait_s": ("Wait on you", "Typical wait on you", duration, "a typical wait of {} or more", 60, _tick_minutes),
+# The small charts under "Over time": day measures from findings.MEASURES, plus two that
+# are not tested against drain (prompts) or are drain itself.
+TREND_KEYS = ("parallel_starts", "mean_concurrency", "median_wait_s", "longest_stretch_min", "day_length_h", "prompts", "drain")
+EXTRA = {
+    "prompts": Measure("Prompts", "Prompts", lambda v: f"{v:.0f}", "", ""),
+    "drain": Measure("Drain", "Drain", lambda v: f"{v:.1f}", "", ""),
 }
 
-# key: (title, how a value reads, fixed top of the y axis or None, tick unit, tick label)
-# Durations get their ticks placed in whole minutes or hours, so the axis reads 2m, 4m.
-TRENDS = {
-    "parallel_starts": ("Parallel starts", _int, None, 1, _tick_plain),
-    "mean_concurrency": ("Agents at once, while busy", _one, None, 1, _tick_plain),
-    "median_wait_s": ("Typical wait on you", duration, None, 60, _tick_minutes),
-    "longest_stretch_min": ("Longest focus stretch", _minutes, None, 60, _tick_hours),
-    "prompts": ("Prompts", _int, None, 1, _tick_plain),
-    "day_length_h": ("Day length", _hours, None, 1, lambda v: f"{v:g}h"),
-    "drain": ("Drain", _one, 5, 1, _tick_plain),
-}
 
+def trend_measure(key: str) -> Measure:
+    return MEASURES.get(key) or EXTRA[key]
 
 
 def window(all_days: dict[date, dict], today: date, key: str) -> tuple[date, date, dict[date, dict]]:
@@ -156,24 +118,42 @@ def concurrency(rows: dict[date, dict]) -> dict | None:
 
 
 def scatter(rows: dict[date, dict], metric: str) -> dict:
-    """Each rated day as (metric, drain), and the same median split the finding uses."""
+    """Each rated day as (metric, drain), and the same higher-half split the finding uses."""
     points = [{"date": d, "x": r[metric], "y": r["drain"]} for d, r in sorted(rows.items())
               if r.get("turns") and r.get("drain") is not None and r.get(metric) is not None]
-    out = {"points": points, "need": 2 * MIN_GROUP_DAYS, "split": None}
-    if len(points) < 2 * MIN_GROUP_DAYS:
-        return out
-    cut = statistics.median(p["x"] for p in points)
-    high = [p["y"] for p in points if p["x"] >= cut]
-    low = [p["y"] for p in points if p["x"] < cut]
-    if len(high) >= MIN_GROUP_DAYS and len(low) >= MIN_GROUP_DAYS:
-        out["split"] = {"cut": cut, "low": statistics.fmean(low), "high": statistics.fmean(high),
-                        "n_low": len(low), "n_high": len(high)}
-    return out
+    need = 2 * MIN_GROUP_DAYS
+    return {"points": points, "need": need,
+            "split": split([(p["x"], p["y"]) for p in points]) if len(points) >= need else None}
+
+
+# Which links belong under which section of the page.
+SECTIONS = {
+    "when": ("start_hour", "end_hour", "day_length_h"),
+    "waits": ("median_wait_s", "long_wait_share"),
+    "busy": ("parallel_starts", "mean_concurrency", "multi_busy_share"),
+}
+
+
+def notes(links: dict) -> dict[str, list[dict]]:
+    """The strongest significant link under each section, so a chart can say what goes with
+    drain. One per section: the full list is at the top of the page, and three notes about
+    one habit under one chart is noise."""
+    return {name: [t for t in links["significant"] if t["key"] in keys][:1] for name, keys in SECTIONS.items()}
+
+
+def standing(all_days: dict[date, dict], key: str, value: float) -> dict:
+    """Where this value sits among your worked days: the shares strictly below and above it,
+    so a value many days share (no parallel starts at all) is not called lower than all of them."""
+    values = [r[key] for r in all_days.values() if r.get("turns") and r.get(key) is not None]
+    if not values:
+        return {"below": 0.0, "above": 0.0, "at": 0.5}
+    below = sum(1 for v in values if v < value) / len(values)
+    above = sum(1 for v in values if v > value) / len(values)
+    return {"below": below, "above": above, "at": (below + 1 - above) / 2}
 
 
 def trend_summary(rows: dict[date, dict], key: str) -> str:
     values = [r[key] for r in rows.values() if r.get("turns") and r.get(key) is not None]
     if not values:
         return ""
-    fmt = TRENDS[key][1]
-    return f"average {fmt(statistics.fmean(values))}"
+    return f"average {trend_measure(key).fmt(statistics.fmean(values))}"

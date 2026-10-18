@@ -15,6 +15,11 @@ contract (what is recorded, the check-in rules, the Vibe Nature heartbeat).
   behaviour, not ours, and it is why the confirmation says Ctrl+U clears the line. Checked
   by hand in a tmux session on Claude Code 2.1.302; re-check after a Claude Code upgrade
   if the check-in looks wrong.
+- **Nothing is called a link to drain unless `findings.links()` says it is significant.**
+  The median split is how a link is *described*, never how one is *found*: a 1.3-point
+  gap over seven days is routinely chance (`test_a_big_split_that_could_be_chance...`).
+  A new day measure goes in `findings.MEASURES`, which also widens the correction, and
+  any new place that mentions drain should read `links["by_key"][key]["significant"]`.
 - **The hook path must stay stdlib only.** `cli.py` and `hook.py` never import Flask at
   module level; a test runs a subprocess to prove it.
 - **Never run `calmlab setup` or `uninstall` against the real `~/.claude/settings.json`

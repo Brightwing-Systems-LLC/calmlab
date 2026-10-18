@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_links.html" as L %}
 {% block main %}
 {% if not has_data %}
   <section class="empty">
@@ -35,11 +36,11 @@
       <span class="pill">Recording since {{ since.strftime('%-d %b') }} · {{ days_recorded }} day{{ '' if days_recorded == 1 else 's' }}</span>
     </div>
     {% if finding.found %}
-      <p class="finding">{{ finding.lead }} <em>{{ finding.emph }}</em>{{ finding.middle }} <em>{{ finding.feel }}</em>.</p>
-      <p class="muted small">From {{ finding.days }} days with a check-in, comparing your higher days with your lower ones. A pattern in your days, not proof of a cause.</p>
+      <p class="finding">{{ finding.lead }} <em>{{ finding.emph }}</em>{{ finding.middle }} you rate yourself <em>{{ finding.feel }}</em>.</p>
+      <p class="muted small">A {{ finding.strength }} link across {{ finding.days }} days with a check-in (rank correlation {{ '%+.2f' % finding.rho }}, {{ finding.p|pval }}), and it holds after testing {{ finding.checked }} measures. A pattern in your days, not proof of a cause.{% if finding.others %} <a href="/patterns">{{ finding.others }} more link{{ '' if finding.others == 1 else 's' }} in Patterns →</a>{% endif %}</p>
     {% elif finding.ready %}
-      <p class="finding">No clear pattern yet between how your days go and how drained you feel.</p>
-      <p class="muted small">From {{ finding.days }} days with a check-in. That can be a finding too: keep answering and it is checked again every day.</p>
+      <p class="finding">Nothing you do lines up reliably with how drained you feel, yet.</p>
+      <p class="muted small">Tested {{ finding.checked }} measures across {{ finding.days }} days with a check-in, and none held up. That can be a finding too: keep answering and it is checked again every day.</p>
     {% else %}
       <p class="finding">Your first finding comes after <em>{{ finding.need }} days</em> with a check-in. You have <em>{{ finding.have }}</em>.</p>
       <p class="muted small">When an agent finishes, CalmLab sometimes asks how drained you are. Type <code>calm 1</code> to <code>calm 5</code> to answer, any time.</p>
@@ -52,16 +53,19 @@
       <span class="v">{{ '%.1f' % w.agents_at_once if w.agents_at_once is not none else '–' }}</span>
       <span class="k">agents at once, while busy</span>
       <span class="d">{{ delta(w.agents_at_once, p.agents_at_once, 'number') or ' ' }}</span>
+      {% if links.by_key.get('mean_concurrency') and links.by_key['mean_concurrency'].significant %}{{ L.tag(links.by_key['mean_concurrency']) }}{% endif %}
     </div>
     <div class="stat">
       <span class="v">{{ duration(w.wait_s) }}</span>
       <span class="k">typical wait on you</span>
       <span class="d">{{ delta(w.wait_s, p.wait_s, 'duration') or ' ' }}</span>
+      {% if links.by_key.get('median_wait_s') and links.by_key['median_wait_s'].significant %}{{ L.tag(links.by_key['median_wait_s']) }}{% endif %}
     </div>
     <div class="stat">
       <span class="v">{{ duration(w.longest_stretch_min * 60) if w.longest_stretch_min is not none else '–' }}</span>
       <span class="k">longest focus stretch</span>
       <span class="d">{{ delta(w.longest_stretch_min, p.longest_stretch_min, 'minutes') or ' ' }}</span>
+      {% if links.by_key.get('longest_stretch_min') and links.by_key['longest_stretch_min'].significant %}{{ L.tag(links.by_key['longest_stretch_min']) }}{% endif %}
     </div>
     <div class="stat">
       <span class="v">{% if w.drain is not none %}{{ '%.1f' % w.drain }}<small> / 5</small>{% else %}–{% endif %}</span>
@@ -83,7 +87,12 @@
     <h3>Days</h3>
     <div class="table">
       <table class="days">
-        <thead><tr><th>Day</th><th>Prompts</th><th>Parallel starts</th><th>Agents at once</th><th>Longest stretch</th><th>Length</th><th>Drain</th></tr></thead>
+        <thead><tr><th>Day</th><th>Prompts</th>
+          {% for key, label in (('parallel_starts', 'Parallel starts'), ('mean_concurrency', 'Agents at once'), ('longest_stretch_min', 'Longest stretch'), ('day_length_h', 'Length')) %}
+          {% set t = links.by_key.get(key) %}
+          <th>{% if t and t.significant %}<span class="th-link" title="{{ t.sentence }}: {{ L.meta(t) }}">{{ label }}</span>{% else %}{{ label }}{% endif %}</th>
+          {% endfor %}
+          <th>Drain</th></tr></thead>
         <tbody>
         {% for d, row in recent %}
           <tr>

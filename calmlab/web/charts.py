@@ -231,17 +231,29 @@ def _jitter(key: str) -> float:
     return (int.from_bytes(key.encode(), "little") * 2654435761 % 1000) / 1000 - 0.5
 
 
-def scatter(data: dict, xlabel: str, fmt, unit: float = 1, tick=str) -> Markup:
+def _clock_range(values: list[float]) -> tuple[float, float, list[float]]:
+    """An axis for times of day: whole hours either side, a tick every hour or two."""
+    lo, hi = math.floor(min(values)), math.ceil(max(values))
+    hi = max(hi, lo + 1)
+    step = 1 if hi - lo <= 6 else 2
+    return lo, hi, list(range(lo, hi + 1, step))
+
+
+def scatter(data: dict, m) -> Markup:
     """Drain against one day measure, one dot a day, with the halves' averages drawn in."""
     pts = data["points"]
+    xlabel, fmt, unit, tick = m.axis, m.fmt, m.unit, m.tick
     W, l, r, t, b = 640, 34, 16, 12, 44
     H = 280
     ph, pw = H - t - b, W - l - r
-    top, steps = _ticks(max((p["x"] for p in pts), default=0) * 1.05 / unit or 1)
-    xmax, xticks = top * unit, [v * unit for v in steps]
+    if m.zero:
+        top, steps = _ticks(max((p["x"] for p in pts), default=0) * 1.05 / unit or 1)
+        xmin, xmax, xticks = 0, top * unit, [v * unit for v in steps]
+    else:
+        xmin, xmax, xticks = _clock_range([p["x"] for p in pts])
 
     def X(v):
-        return l + v / xmax * pw
+        return l + (v - xmin) / (xmax - xmin) * pw
 
     def Y(v):
         return t + (5 - v) / 4 * ph
@@ -251,7 +263,7 @@ def scatter(data: dict, xlabel: str, fmt, unit: float = 1, tick=str) -> Markup:
         body.append(f'<line class="grid{" grid-base" if v == 1 else ""}" x1="{l}" x2="{W - r}" y1="{Y(v):.1f}" y2="{Y(v):.1f}"/>')
         body.append(_text(l - 10, Y(v) + 3.5, v, anchor="end"))
     for i, v in enumerate(xticks):
-        body.append(_text(X(v), H - b + 18, tick(v) if v else "0", anchor="end" if i == len(xticks) - 1 else "middle"))
+        body.append(_text(X(v), H - b + 18, tick(v) if v or not m.zero else "0", anchor="end" if i == len(xticks) - 1 else "middle"))
     body.append(_text(l + pw / 2, H - 6, xlabel, "ax ax-label", "middle"))
     split = data["split"]
     if split:
@@ -272,12 +284,12 @@ def scatter(data: dict, xlabel: str, fmt, unit: float = 1, tick=str) -> Markup:
     return _svg(W, H, body, f"Drain against {xlabel.lower()}, one dot per day")
 
 
-def trend(all_days: dict[date, dict], start: date, end: date, key: str, fmt, ymax_fixed=None,
-          unit: float = 1, tick=str) -> Markup:
+def trend(all_days: dict[date, dict], start: date, end: date, key: str, m, ymax_fixed=None) -> Markup:
     """A small daily bar chart over the range, with a line for the average of the last seven days worked.
 
-    Ticks are placed in multiples of `unit` (60 turns seconds into whole minutes) and
-    labelled by `tick`."""
+    Ticks are placed in multiples of the measure's unit (60 turns seconds into whole
+    minutes) and labelled by its tick format."""
+    fmt, unit, tick = m.fmt, m.unit, m.tick
     W, l, r, t, base = 420, 44, 6, 8, 104
     H = base + 20
     span = [start + timedelta(days=i) for i in range((end - start).days + 1)]

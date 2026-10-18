@@ -14,6 +14,8 @@ Definitions (also in README.md):
 - **longest stretch**: the longest run of activity (events and running turns) with no
   gap of GAP_S or more.
 - **day length**: first to last event of the local day.
+- **start and end hour**: local clock time of the day's first event and last activity.
+- **long-wait share**: the share of waits over LONG_WAIT_S.
 - **busy by level**: seconds with 1, 2, 3, or 4 or more turns running at once.
 """
 
@@ -29,6 +31,7 @@ from datetime import UTC, date, datetime, timedelta
 MAX_TURN_S = 2 * 3600
 MAX_WAIT_S = 2 * 3600
 GAP_S = 10 * 60
+LONG_WAIT_S = 10 * 60
 UNCLOSED_TURN_S = 60
 
 
@@ -204,6 +207,11 @@ def _longest_stretch(intervals: list[tuple[float, float]]) -> float:
     return max(best, cur_e - cur_s)
 
 
+def _clock_hours(ts: float, offset_min: int, day: date) -> float:
+    """Hours from that day's local midnight, so a turn running past midnight ends at 24.5, not 0.5."""
+    return (local_dt(ts, offset_min) - datetime(day.year, day.month, day.day)).total_seconds() / 3600
+
+
 def _median(values):
     values = [v for v in values if v is not None]
     return statistics.median(values) if values else None
@@ -283,6 +291,9 @@ def daily(events: list[dict]) -> dict[date, dict]:
             "prompts_per_hour": len(prompts) / hours,
             "longest_stretch_min": _longest_stretch(activity) / 60,
             "day_length_h": day_length_h,
+            "start_hour": _clock_hours(first, evs[0]["utc_offset_min"], day),
+            "end_hour": _clock_hours(last, evs[-1]["utc_offset_min"], day),
+            "long_wait_share": (sum(1 for w in waits if w > LONG_WAIT_S) / len(waits)) if waits else None,
             "tool_fails": sum(1 for e in evs if e["kind"] == "tool_fail"),
             "needs_input": sum(1 for e in evs if e["kind"] == "needs_input"),
             "scene_share": (sum(scene_flags) / len(scene_flags)) if scene_flags else None,

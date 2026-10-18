@@ -52,7 +52,15 @@ def test_scatter_splits_at_the_median_once_there_are_enough_days():
             for i, (ps, dr) in enumerate([(5, 2), (6, 2), (7, 1), (30, 4), (31, 5), (32, 4)], start=1)}
     s = patterns.scatter(rows, "parallel_starts")
     assert len(s["points"]) == 6
-    assert s["split"]["cut"] == 18.5
+    assert s["split"]["cut"] == 30, "the lowest value in the higher half"
     assert round(s["split"]["high"], 2) == 4.33 and round(s["split"]["low"], 2) == 1.67
     few = patterns.scatter(dict(list(rows.items())[:5]), "parallel_starts")
     assert few["split"] is None
+
+
+def test_standing_counts_ties_as_neither_side():
+    rows = {date(2026, 9, i): day(parallel_starts=v) for i, v in enumerate([0, 0, 0, 0, 5, 9, 12, 20], start=1)}
+    s = patterns.standing(rows, "parallel_starts", 0)
+    assert s["below"] == 0 and s["above"] == 0.5
+    s = patterns.standing(rows, "parallel_starts", 20)
+    assert s["below"] == 0.875 and s["above"] == 0

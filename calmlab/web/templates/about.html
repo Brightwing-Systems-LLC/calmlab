@@ -6,6 +6,16 @@
     <h1>What CalmLab records</h1>
   </section>
   <pre class="term" style="white-space:pre-wrap">{{ recorded }}</pre>
+  <section class="stack" id="links">
+    <h3>How links to drain are tested</h3>
+    <div class="muted measure prose">
+      <p>CalmLab checks {{ measures|length }} things about each day against your check-ins: {% for m in measures.values() %}{{ m.label|lower }}{{ ', ' if not loop.last else '.' }}{% endfor %} It uses only days with both the measure and at least one check-in, and starts once there are {{ need }} such days.</p>
+      <p>Each measure gets a <b>rank correlation</b> (Spearman's): do your higher days on that measure go with higher drain? Ranks suit a 1 to 5 rating and skewed counts. The p-value comes from shuffling your drain answers across days thousands of times and seeing how often chance alone matches the link, so it assumes nothing about how the numbers are spread.</p>
+      <p>Testing ten things at once makes a lucky hit likely, so a link is shown only if it survives the <b>Benjamini–Hochberg</b> correction at 5% across all of them. Measures that rise and fall together, such as parallel starts and agents at once, are listed as one habit.</p>
+      <p>What this can't tell you: whether one causes the other, or whether both follow something else, like a deadline week. Days next to each other are also more alike than random days, which makes links look a little surer than they are. Read a link as “worth noticing”, and the Vibe Nature experiment as the way to test a change properly.</p>
+    </div>
+  </section>
+
   <section class="stack">
     <h3>Stopping and erasing</h3>
     <p class="muted measure">Run these from the CalmLab folder. Uninstall removes only CalmLab's hooks and leaves your other Claude Code settings as they were.</p>

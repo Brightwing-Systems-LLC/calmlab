@@ -23,19 +23,43 @@ def test_not_ready_before_seven_days_with_a_checkin():
     assert f == {"ready": False, "have": 6, "need": 7}
 
 
-def test_finds_the_split_that_lines_up_with_drain():
-    f = findings.finding(fake_days([(5, 2), (8, 2), (6, 1), (30, 4), (40, 5), (35, 4), (7, 2), (33, 4)]))
+def test_a_clear_link_becomes_the_finding():
+    pairs = [(5, 2), (8, 2), (6, 1), (30, 4), (40, 5), (35, 4), (7, 2), (33, 4), (12, 2), (28, 4), (3, 1), (45, 5)]
+    f = findings.finding(fake_days(pairs))
     assert f["found"] and f["metric"] == "parallel_starts"
-    assert f["threshold"] == 30
-    assert f["diff"] > 2
-    sentence = f"{f['lead']} {f['emph']}{f['middle']} {f['feel']}."
-    assert sentence.startswith("On days you start 30 or more agents while another is still running, you rate yourself")
-    assert sentence.endswith("points more drained.")
+    assert f["rho"] > 0.8 and f["p"] < 0.01 and f["strength"] == "strong"
+    assert f["checked"] >= 1, "measures with no variation are not tested"
+    sentence = f"{f['lead']} {f['emph']}{f['middle']} you rate yourself {f['feel']}."
+    assert sentence == "On days with 28 or more parallel starts, you rate yourself 2.7 points more drained."
+
+
+def test_a_big_split_that_could_be_chance_is_not_a_finding():
+    # Seven days and a 1.3 point gap between the halves, which the old rule would have
+    # announced; ranked, it is no better than a coin.
+    f = findings.finding(fake_days([(5, 3), (30, 4), (6, 1), (31, 5), (7, 3), (32, 1), (8, 3)]))
+    assert f["ready"] and not f["found"]
 
 
 def test_says_so_when_there_is_no_pattern():
     f = findings.finding(fake_days([(5, 3), (30, 3), (6, 3), (31, 3), (7, 3), (32, 3), (8, 3)]))
-    assert f == {"ready": True, "found": False, "days": 7}
+    assert f == {"ready": True, "found": False, "days": 7, "checked": 0}
+
+
+def test_measures_that_move_together_are_one_habit():
+    pairs = [(5, 2), (8, 2), (6, 1), (30, 4), (40, 5), (35, 4), (7, 2), (33, 4), (12, 2), (28, 4), (3, 1), (45, 5)]
+    days = fake_days(pairs)
+    for row in days.values():
+        row["mean_concurrency"] = 1 + row["parallel_starts"] / 50
+    found = findings.links(days)
+    assert [t["key"] for t in found["significant"]] == ["parallel_starts", "mean_concurrency"] or \
+        [t["key"] for t in found["significant"]] == ["mean_concurrency", "parallel_starts"]
+    (group,) = found["groups"]
+    assert [a["key"] for a in group["also"]] == [k for k in ("parallel_starts", "mean_concurrency") if k != group["key"]]
+
+
+def test_the_split_moves_off_a_floor_of_zeros():
+    s = findings.split([(0, 1), (0, 2), (0, 1), (0, 2), (4, 4), (9, 5), (6, 4)])
+    assert s["cut"] == 4 and s["n_low"] == 4 and s["n_high"] == 3
 
 
 def test_days_joins_checkins_onto_metric_days():

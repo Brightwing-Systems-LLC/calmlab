@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_links.html" as L %}
 {% block title %}Patterns · CalmLab{% endblock %}
 {% block main %}
 {% if not has_data %}
@@ -21,6 +22,29 @@
     <p class="muted">{{ start.strftime('%-d %b') }} to {{ end.strftime('%-d %b %Y') }} · {{ active_days }} day{{ '' if active_days == 1 else 's' }} worked</p>
   </section>
 
+  <section class="links" aria-labelledby="links-h">
+    <div class="chart-head">
+      <h3 id="links-h">What goes with feeling drained</h3>
+      <a class="small" href="/about#links">How links are tested</a>
+    </div>
+    {% if not links.ready %}
+      <p class="muted">Links between your days and how drained you feel are tested once there are {{ links.need }} days with a check-in. This range has {{ links.days }}.</p>
+    {% elif links.groups %}
+      <ul class="link-list">
+      {% for t in links.groups %}
+        <li>
+          <a class="lede" href="?range={{ range_key }}&x={{ t.key }}#drain">{{ t.sentence }}</a>
+          <span class="muted small">{% if t.split %}higher days average {{ '%.1f' % t.split.high }}, lower {{ '%.1f' % t.split.low }} · {% endif %}{{ L.meta(t) }}{% if t.also %} · moves with {% for a in t.also %}{{ a.measure.label|lower }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}</span>
+        </li>
+      {% endfor %}
+      </ul>
+      <p class="muted small">Tested {{ links.tested|length }} measures across {{ links.days }} days with a check-in. A link is a pattern in your days, not proof of a cause.</p>
+    {% else %}
+      <p class="lede">Nothing in these days lines up reliably with how drained you feel.</p>
+      <p class="muted small">Tested {{ links.tested|length }} measures across {{ links.days }} days with a check-in. That can change as you keep answering.</p>
+    {% endif %}
+  </section>
+
   {% if grid %}
   <section class="stack">
     <div class="chart-head">
@@ -29,6 +53,7 @@
     </div>
     <p class="lede">{{ grid.sentence }}</p>
     <div class="chart">{{ heatmap }}</div>
+    {% for t in notes.when %}{{ L.note(t) }}{% endfor %}
   </section>
   {% endif %}
 
@@ -38,6 +63,7 @@
       <h3>How long agents wait for you</h3>
       <p class="lede">{{ waits.sentence }}</p>
       <div class="chart chart-fit">{{ wait_chart }}</div>
+      {% for t in notes.waits %}{{ L.note(t) }}{% endfor %}
       <p class="muted small">From the end of each reply to your next prompt in that session, {{ waits.count }} in all. Gaps over two hours count as breaks.</p>
     </section>
     {% endif %}
@@ -46,29 +72,33 @@
       <h3>How many agents at once</h3>
       <p class="lede">{{ busy.sentence }}</p>
       <div class="chart chart-fit">{{ busy_chart }}</div>
+      {% for t in notes.busy %}{{ L.note(t) }}{% endfor %}
       <p class="muted small">Share of the time any agent was working.</p>
     </section>
     {% endif %}
   </div>
 
-  <section class="stack">
+  <section class="stack" id="drain">
     <div class="chart-head">
       <h3>Drain against your days</h3>
-      <nav class="seg seg-sm" aria-label="Compare drain with">
-        {% for k, m in x_metrics.items() %}
-        <a href="?range={{ range_key }}&x={{ k }}" {% if k == x %}aria-current="true"{% endif %}>{{ m[0] }}</a>
-        {% endfor %}
-      </nav>
     </div>
+    <nav class="seg seg-sm seg-wrap" aria-label="Compare drain with">
+      {% for k, m in measures.items() %}
+      <a href="?range={{ range_key }}&x={{ k }}#drain" {% if k == x %}aria-current="true"{% endif %}>{{ m.label }}{% if links.by_key.get(k) and links.by_key[k].significant %}<i class="seg-dot" title="Linked to drain"></i>{% endif %}</a>
+      {% endfor %}
+    </nav>
     {% if scatter %}
       {% set s = points.split %}
-      {% if s and (s.high - s.low)|abs >= min_diff %}
-      <p class="lede">On days with {{ xphrase(s.cut) }}, your drain averages <em>{{ '%.1f' % s.high }}</em>. Below that, <em>{{ '%.1f' % s.low }}</em>.</p>
+      {% if s and link and link.significant %}
+      <p class="lede">On days with {{ measure.phrase.format(measure.fmt(s.cut)) }}, your drain averages <em>{{ '%.1f' % s.high }}</em>. Below that, <em>{{ '%.1f' % s.low }}</em>.</p>
+      {% elif s and (s.high - s.low)|abs >= min_diff %}
+      <p class="lede">Days with {{ measure.phrase.format(measure.fmt(s.cut)) }} average {{ '%.1f' % s.high }} against {{ '%.1f' % s.low }} for the rest, but a gap like that could be chance.</p>
       {% elif s %}
-      <p class="lede">Days with {{ xphrase(s.cut) }} feel about the same as the rest: drain <em>{{ '%.1f' % s.high }}</em> against <em>{{ '%.1f' % s.low }}</em>.</p>
+      <p class="lede">Days with {{ measure.phrase.format(measure.fmt(s.cut)) }} feel about the same as the rest: drain <em>{{ '%.1f' % s.high }}</em> against <em>{{ '%.1f' % s.low }}</em>.</p>
       {% endif %}
       <div class="chart">{{ scatter }}</div>
-      <p class="muted small">One dot per day with a check-in. The shaded side is your higher half of days. A pattern in your days, not proof of a cause.</p>
+      {% if link %}<p class="verdict{{ ' verdict-yes' if link.significant }}">{{ L.verdict(link, links.tested|length) }}</p>{% endif %}
+      <p class="muted small">One dot per day with a check-in. The shaded side is your higher half of days.</p>
     {% else %}
       <p class="muted">This appears after {{ points.need }} days with a check-in. You have {{ points.points|length }} in this range. Type <code>calm 1</code> to <code>calm 5</code> in Claude Code, any time.</p>
     {% endif %}
@@ -82,7 +112,7 @@
     <div class="multiples">
       {% for t in trends %}
       <div class="multiple">
-        <div class="mhead"><b>{{ t.title }}</b><span class="muted small">{{ t.summary }}</span></div>
+        <div class="mhead"><b>{{ t.title }}{% if t.link and t.link.significant %} {{ L.tag(t.link) }}{% endif %}</b><span class="muted small">{{ t.summary }}</span></div>
         <div class="chart chart-fit">{{ t.chart }}</div>
       </div>
       {% endfor %}

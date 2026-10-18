@@ -1,0 +1,21 @@
+{% macro meta(t) -%}
+{{ t.strength }} link · rank correlation {{ '%+.2f' % t.rho }} · {{ t.n }} days · {{ t.p|pval }}
+{%- endmacro %}
+
+{% macro note(t) -%}
+<p class="link-note"><i aria-hidden="true"></i><span><b>{{ t.sentence }}.</b> <span class="muted">{{ meta(t) }}</span></span></p>
+{%- endmacro %}
+
+{% macro tag(t) -%}
+<span class="link-tag" title="{{ t.sentence }}: {{ meta(t) }}">linked to drain</span>
+{%- endmacro %}
+
+{% macro verdict(t, checked) -%}
+{% if t.significant -%}
+A {{ t.strength }} link: rank correlation {{ '%+.2f' % t.rho }} across {{ t.n }} days ({{ t.p|pval }}). It holds after testing all {{ checked }} measures, so it is unlikely to be chance.
+{%- elif t.p < 0.05 -%}
+Suggestive, not reliable: rank correlation {{ '%+.2f' % t.rho }} across {{ t.n }} days ({{ t.p|pval }}), which doesn't survive testing {{ checked }} measures at once.
+{%- else -%}
+No reliable link: rank correlation {{ '%+.2f' % t.rho }} across {{ t.n }} days ({{ t.p|pval }}).
+{%- endif %}
+{%- endmacro %}

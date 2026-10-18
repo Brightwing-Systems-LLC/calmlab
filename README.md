@@ -73,15 +73,24 @@ requests that don't name it as the host.
 | **longest focus stretch** | the longest run of activity with no gap of 10 minutes or more |
 | **drain** | your check-ins, 1 (not at all) to 5 (completely) |
 
-After seven days with a check-in, the home page looks for the one way your days split
-(more parallel starts, longer days, and so on) that lines up best with how drained you
-said you were, and says it in a sentence if the difference is at least half a point. It
-compares your higher days with your lower ones: a pattern, not a cause.
+After seven days with a check-in, CalmLab tests ten day measures (parallel starts,
+agents at once, time juggling agents, day length, start and finish time, focus stretch,
+wait on you, long waits, prompt pace) against how drained you said you were. Each gets a
+Spearman rank correlation with a permutation p-value, and a link is shown only if it
+survives a Benjamini-Hochberg correction at 5% across all ten, so looking at many things
+doesn't turn up one by luck. Measures that move together are folded into one habit.
+
+The strongest link that holds up is the sentence on the home page ("On days with 19 or
+more parallel starts, you rate yourself 1.5 points more drained"). Links also mark the
+stat cards and table columns they touch, sit under the matching Patterns charts, and show
+on each day's page as where that day fell. It is a pattern in your own days, not a cause:
+neighbouring days are alike, and a busy week can drive both sides. The About page says
+this in full.
 
 The **Patterns** tab is the longer look, over two weeks, eight weeks or everything: when
 in the day you work, how long your agents wait for you, how many you run at once, drain
-plotted against any of the day measures above, and each measure over time with a
-seven-day average. It is drawn from the same data; nothing extra is recorded for it.
+plotted against any of the day measures above with the test's verdict, and each measure
+over time with a seven-day average. It is drawn from the same data; nothing extra is recorded for it.
 
 ## Vibe Nature
 

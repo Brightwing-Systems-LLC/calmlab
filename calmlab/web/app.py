@@ -53,6 +53,10 @@ def create_app(port: int = 7474) -> Flask:
         if request.method == "POST" and request.form.get("token") != app.config["TOKEN"]:
             abort(403)
 
+    @app.template_filter("pval")
+    def pval(p: float) -> str:
+        return "p < 0.001" if p < 0.001 else f"p = {p:.3f}" if p < 0.01 else f"p = {p:.2f}"
+
     @app.context_processor
     def common():
         return {"token": app.config["TOKEN"], "version": __version__, "data_folder": str(paths.home())}
@@ -71,7 +75,7 @@ def create_app(port: int = 7474) -> Flask:
             "you.html", tab="you", demo=demo, pending=pending, labels=checkin.DRAIN_LABELS,
             has_data=bool(evs), recording=recording,
             days_recorded=len([d for d in all_days.values() if d.get("turns")]),
-            since=recording_since, finding=findings.finding(all_days),
+            since=recording_since, finding=findings.finding(all_days), links=findings.links(all_days),
             week=findings.week(all_days, today), chart=charts.daily_bars(all_days, today),
             recent=[(d, row) for d, row in sorted(all_days.items(), reverse=True) if row.get("turns")][:14],
             duration=findings.duration, delta=findings.delta,
@@ -84,28 +88,30 @@ def create_app(port: int = 7474) -> Flask:
         key = request.args.get("range", patterns.DEFAULT_RANGE)
         key = key if key in patterns.RANGES else patterns.DEFAULT_RANGE
         start, end, rows = patterns.window(all_days, date.today(), key)
-        found = findings.finding(all_days)
-        x = request.args.get("x") or (found.get("metric") if found.get("found") else None)
-        x = x if x in patterns.X_METRICS else "parallel_starts"
+        links = findings.links(rows)
+        x = request.args.get("x") or (links["groups"][0]["key"] if links["groups"] else "parallel_starts")
+        x = x if x in findings.MEASURES else "parallel_starts"
+        measure = findings.MEASURES[x]
         grid = patterns.hour_grid(rows)
         waits = patterns.wait_bins(rows)
         busy = patterns.concurrency(rows)
         points = patterns.scatter(rows, x)
-        _, xlabel, xfmt, xphrase, xunit, xtick = patterns.X_METRICS[x]
-        trends = [
-            {"title": title, "summary": patterns.trend_summary(rows, k),
-             "chart": charts.trend(all_days, start, end, k, fmt, top, unit, tick)}
-            for k, (title, fmt, top, unit, tick) in patterns.TRENDS.items()
-        ]
+        trends = []
+        for k in patterns.TREND_KEYS:
+            m = patterns.trend_measure(k)
+            trends.append({"key": k, "title": m.axis if k in findings.MEASURES else m.label,
+                           "summary": patterns.trend_summary(rows, k), "link": links["by_key"].get(k),
+                           "chart": charts.trend(all_days, start, end, k, m, 5 if k == "drain" else None)})
         return render_template(
             "patterns.html", tab="patterns", demo=demo, recording=recording, has_data=bool(evs),
             ranges=patterns.RANGES, range_key=key, start=start, end=end,
             active_days=sum(1 for r in rows.values() if r.get("turns")),
-            x=x, x_metrics=patterns.X_METRICS, grid=grid, heatmap=charts.heatmap(grid) if grid else "",
+            links=links, notes=patterns.notes(links), measures=findings.MEASURES, x=x, measure=measure,
+            grid=grid, heatmap=charts.heatmap(grid) if grid else "",
             waits=waits, wait_chart=charts.share_bars(waits["bins"], "How long your agents wait for you") if waits else "",
             busy=busy, busy_chart=charts.share_bars(busy["bars"], "How many agents you have running at once") if busy else "",
-            points=points, scatter=charts.scatter(points, xlabel, xfmt, xunit, xtick) if len(points["points"]) >= points["need"] else "",
-            xphrase=lambda v: xphrase.format(xfmt(v)), min_diff=findings.MIN_DIFF, trends=trends,
+            points=points, scatter=charts.scatter(points, measure) if len(points["points"]) >= points["need"] else "",
+            link=links["by_key"].get(x), min_diff=findings.MIN_DIFF, trends=trends,
         )
 
     @app.get("/day/<iso>")
@@ -122,8 +128,12 @@ def create_app(port: int = 7474) -> Flask:
         active = sorted(k for k, v in all_days.items() if v.get("turns"))
         i = active.index(d)
         tl = metrics.timeline(evs, d)
+        compare = [
+            {"link": t, "value": row[t["key"]], **patterns.standing(all_days, t["key"], row[t["key"]])}
+            for t in findings.links(all_days)["groups"] if row.get(t["key"]) is not None
+        ]
         return render_template(
-            "day.html", tab="you", demo=demo, d=d, row=row, duration=findings.duration,
+            "day.html", tab="you", demo=demo, d=d, row=row, duration=findings.duration, compare=compare,
             chart=charts.timeline(tl, _offset(tl["events"])),
             checkins=[c for c in cks if c["local_date"] == iso], labels=checkin.DRAIN_LABELS,
             prev=active[i - 1] if i else None, next=active[i + 1] if i + 1 < len(active) else None,
@@ -146,7 +156,8 @@ def create_app(port: int = 7474) -> Flask:
     @app.get("/about")
     def about():
         _, _, _, demo, _ = _load()
-        return render_template("about.html", tab=None, demo=demo, recorded=WHAT_IS_RECORDED)
+        return render_template("about.html", tab=None, demo=demo, recorded=WHAT_IS_RECORDED,
+                               measures=findings.MEASURES, need=findings.MIN_CHECKIN_DAYS)
 
     @app.post("/checkin")
     def answer():

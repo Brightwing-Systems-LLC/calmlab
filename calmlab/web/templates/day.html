@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_links.html" as L %}
 {% block title %}{{ d.strftime('%A %-d %B') }} · CalmLab{% endblock %}
 {% block main %}
   <nav class="daynav" aria-label="Other days">
@@ -31,6 +32,23 @@
     <div class="chart">{{ chart }}</div>
     <p class="muted small">Each row is one agent running at the same time as the others. {{ row.prompts }} prompts across {{ row.sessions }} session{{ '' if row.sessions == 1 else 's' }}, {{ '%.1f' % row.day_length_h }} hours from first to last.</p>
   </section>
+
+  {% if compare %}
+  <section class="stack">
+    <h3>On what goes with your drain</h3>
+    <ul class="compare">
+      {% for c in compare %}
+      <li>
+        <span class="cv">{{ c.link.measure.fmt(c.value) }}</span>
+        <span><b>{{ c.link.measure.axis }}</b>: {% if c.below > c.above %}higher than {{ '%.0f' % (c.below * 100) }}% of your days{% elif c.above > c.below %}lower than {{ '%.0f' % (c.above * 100) }}% of your days{% else %}about the middle of your days{% endif %}.
+          <span class="muted">{{ c.link.sentence }}.</span></span>
+        <span class="meter" aria-hidden="true"><i style="left: {{ '%.0f' % (c.at * 100) }}%"></i></span>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="muted small">Only measures with a link to drain that holds up across all your days. <a href="/patterns">See them in Patterns</a>.</p>
+  </section>
+  {% endif %}
 
   <section class="stack">
     <h3>Check-ins</h3>
