@@ -177,7 +177,8 @@ def _summary(rows: list[dict]) -> dict:
 def week(all_days: dict[date, dict], today: date) -> dict:
     this = _summary(_window(all_days, today))
     prev = _summary(_window(all_days, today - timedelta(days=7)))
-    return {"this": this, "prev": prev if prev["active_days"] else None}
+    # A first week has nothing before it: every value None, so each delta is blank.
+    return {"this": this, "prev": prev if prev["active_days"] else _summary([])}
 
 
 def _points(n: float) -> str:

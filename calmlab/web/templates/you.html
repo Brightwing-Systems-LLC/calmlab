@@ -47,7 +47,7 @@
     {% endif %}
   </section>
 
-  {% set w = week.this %}{% set p = week.prev or {} %}
+  {% set w = week.this %}{% set p = week.prev %}
   <section class="stats" aria-label="The last seven days">
     <div class="stat">
       <span class="v">{{ '%.1f' % w.agents_at_once if w.agents_at_once is not none else '–' }}</span>

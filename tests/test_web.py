@@ -63,6 +63,16 @@ def test_patterns_empty_state(client, calmlab_home):
     assert "Nothing to see yet." in client.get("/patterns").get_data(as_text=True)
 
 
+def test_the_first_day_of_real_work_renders(client, consented):
+    now = time.time()
+    with store.connect() as conn:
+        for kind, at in (("session_start", now - 600), ("prompt_submit", now - 590), ("turn_start", now - 590),
+                         ("turn_end", now - 300), ("prompt_submit", now - 100), ("turn_start", now - 100)):
+            store.add_event(conn, store.Event(kind=kind, ts=at, utc_offset_min=0, session="a" * 16))
+    for path in ("/", "/patterns", "/experiment", "/about"):
+        assert client.get(path).status_code == 200, path
+
+
 def test_unknown_or_empty_days_are_404(client, demo):
     assert client.get("/day/not-a-date").status_code == 404
     assert client.get(f"/day/{date(2001, 1, 1).isoformat()}").status_code == 404
