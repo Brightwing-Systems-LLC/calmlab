@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# One-time setup: installs CalmLab's Python environment, shows what is recorded, asks
+# you to agree, and adds the hooks to Claude Code.
+set -euo pipefail
+cd "$(dirname "$0")"
+if ! command -v uv >/dev/null 2>&1; then
+  echo "CalmLab needs uv. Install it from https://docs.astral.sh/uv/getting-started/installation/ and run ./setup again."
+  exit 1
+fi
+uv sync --quiet --no-dev
+exec uv run --quiet --no-dev calmlab setup "$@"

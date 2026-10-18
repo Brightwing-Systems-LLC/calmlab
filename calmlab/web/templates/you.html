@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block main %}
+{% if not has_data %}
+  <section class="empty">
+    <span class="eyebrow">Nothing recorded yet</span>
+    {% if not consent or not hooked %}
+      <h1>CalmLab isn't recording yet.</h1>
+      <p class="muted measure">Run setup from the CalmLab folder. It shows what is recorded, asks you to agree, and adds the hooks to Claude Code.</p>
+      <pre class="term">./setup</pre>
+    {% else %}
+      <h1>You're set up. Go and work.</h1>
+      <p class="muted measure">CalmLab records the Claude Code sessions you start from now on. Come back after a session or two and this page fills in. Sessions that were already open when you ran setup aren't recorded until you restart them.</p>
+    {% endif %}
+  </section>
+{% else %}
+
+  {% if pending %}
+  <section class="ask" aria-labelledby="ask-q">
+    <span class="eyebrow">Check-in</span>
+    <h2 id="ask-q">How drained are you right now?</h2>
+    <form method="post" action="/checkin" class="scale">
+      <input type="hidden" name="token" value="{{ token }}">
+      {% for n, label in labels.items() %}
+      <button type="submit" name="drain" value="{{ n }}"><b>{{ n }}</b><span>{{ label }}</span></button>
+      {% endfor %}
+    </form>
+  </section>
+  {% elif request.args.get('answered') %}
+  <p class="thanks">Check-in recorded. Thanks.</p>
+  {% endif %}
+
+  <section class="stack">
+    <div class="status">
+      <span class="eyebrow">This week · finding</span>
+      <span class="pill">Recording since {{ since.strftime('%-d %b') }} · {{ days_recorded }} day{{ '' if days_recorded == 1 else 's' }}</span>
+    </div>
+    {% if finding.found %}
+      <p class="finding">{{ finding.lead }} <em>{{ finding.emph }}</em>{{ finding.middle }} <em>{{ finding.feel }}</em>.</p>
+      <p class="muted small">From {{ finding.days }} days with a check-in, comparing your higher days with your lower ones. A pattern in your days, not proof of a cause.</p>
+    {% elif finding.ready %}
+      <p class="finding">No clear pattern yet between how your days go and how drained you feel.</p>
+      <p class="muted small">From {{ finding.days }} days with a check-in. That can be a finding too: keep answering and it is checked again every day.</p>
+    {% else %}
+      <p class="finding">Your first finding comes after <em>{{ finding.need }} days</em> with a check-in. You have <em>{{ finding.have }}</em>.</p>
+      <p class="muted small">When an agent finishes, CalmLab sometimes asks how drained you are. Type <code>calm 1</code> to <code>calm 5</code> to answer, any time.</p>
+    {% endif %}
+  </section>
+
+  {% set w = week.this %}{% set p = week.prev or {} %}
+  <section class="stats" aria-label="The last seven days">
+    <div class="stat">
+      <span class="v">{{ '%.1f' % w.agents_at_once if w.agents_at_once is not none else '–' }}</span>
+      <span class="k">agents at once, while busy</span>
+      <span class="d">{{ delta(w.agents_at_once, p.agents_at_once, 'number') or ' ' }}</span>
+    </div>
+    <div class="stat">
+      <span class="v">{{ duration(w.wait_s) }}</span>
+      <span class="k">typical wait on you</span>
+      <span class="d">{{ delta(w.wait_s, p.wait_s, 'duration') or ' ' }}</span>
+    </div>
+    <div class="stat">
+      <span class="v">{{ duration(w.longest_stretch_min * 60) if w.longest_stretch_min is not none else '–' }}</span>
+      <span class="k">longest focus stretch</span>
+      <span class="d">{{ delta(w.longest_stretch_min, p.longest_stretch_min, 'minutes') or ' ' }}</span>
+    </div>
+    <div class="stat">
+      <span class="v">{% if w.drain is not none %}{{ '%.1f' % w.drain }}<small> / 5</small>{% else %}–{% endif %}</span>
+      <span class="k">drain, {{ w.checkins }} check-in{{ '' if w.checkins == 1 else 's' }}</span>
+      <span class="d">{{ delta(w.drain, p.drain, 'number') or ' ' }}</span>
+    </div>
+  </section>
+
+  <section class="stack">
+    <div class="chart-head">
+      <h3>Parallel starts per day</h3>
+      <span class="muted small">Starting an agent while another is still working. Circles are your drain check-ins.</span>
+    </div>
+    <div class="chart">{{ chart }}</div>
+  </section>
+
+  <section class="stack">
+    <h3>Days</h3>
+    <div class="table">
+      <table class="days">
+        <thead><tr><th>Day</th><th>Prompts</th><th>Parallel starts</th><th>Agents at once</th><th>Longest stretch</th><th>Length</th><th>Drain</th></tr></thead>
+        <tbody>
+        {% for d, row in recent %}
+          <tr>
+            <td><a href="/day/{{ d.isoformat() }}">{{ d.strftime('%a %-d %b') }}</a></td>
+            <td>{{ row.prompts }}</td>
+            <td>{{ row.parallel_starts }}</td>
+            <td>{{ '%.1f' % row.mean_concurrency }}</td>
+            <td>{{ duration(row.longest_stretch_min * 60) }}</td>
+            <td>{{ '%.1f' % row.day_length_h }}h</td>
+            <td>{{ '%.1f' % row.drain if row.drain is not none else '–' }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endif %}
+{% endblock %}

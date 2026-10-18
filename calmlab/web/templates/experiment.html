@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Experiment · CalmLab{% endblock %}
+{% block main %}
+  <section class="stack">
+    <span class="eyebrow">Experiment</span>
+    <h1>Does Vibe Nature change how you work?</h1>
+    <p class="muted measure">CalmLab can run a fair test on you: it turns the scene on for some days and off for others, at random, then compares the two. You get a plain answer, including “no clear difference” if that's what the numbers say.</p>
+  </section>
+
+  <ol class="steps">
+    <li class="{{ 'done' if days_recorded >= baseline_target else '' }}">
+      <b>Record your normal days</b>
+      <span class="muted">{{ days_recorded }} of {{ baseline_target }} days so far. Just work as usual; this is the picture of you without the scene.</span>
+    </li>
+    <li>
+      <b>Link Vibe Nature</b>
+      <span class="muted">
+        {% if scene %}Vibe Nature is running and reporting to CalmLab.
+        {% elif scene is sameas false %}Vibe Nature has reported before but isn't running now.
+        {% else %}Vibe Nature hasn't been found on this computer.{% endif %}
+        Linking it, so CalmLab can turn it on and off, comes in the next version.
+      </span>
+    </li>
+    <li>
+      <b>Mixed days</b>
+      <span class="muted">Workdays in pairs, one with the scene and one without, decided in advance. If you switch it yourself on an assigned day, that day is left out of the comparison.</span>
+    </li>
+    <li>
+      <b>Your result</b>
+      <span class="muted">After two weeks of mixed days: what changed, by how much, and how sure the numbers are.</span>
+    </li>
+  </ol>
+{% endblock %}

@@ -1,0 +1,37 @@
+[project]
+name = "calmlab"
+version = "0.2.0"
+description = "How you work with coding agents, measured on your own machine. Times and counts only, never text."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+  # Only the web view imports it. The hook path is stdlib only, so a hook call never
+  # pays for importing it.
+  "flask>=3.1",
+]
+
+[project.scripts]
+calmlab = "calmlab.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["calmlab"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 140
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+# Chart code names its margins l, r, t, b, as the old dashboards did.
+ignore = ["E741"]

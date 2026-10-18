@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ d.strftime('%A %-d %B') }} · CalmLab{% endblock %}
+{% block main %}
+  <nav class="daynav" aria-label="Other days">
+    <span>{% if prev %}<a href="/day/{{ prev.isoformat() }}">← {{ prev.strftime('%a %-d %b') }}</a>{% endif %}</span>
+    <span>{% if next %}<a href="/day/{{ next.isoformat() }}">{{ next.strftime('%a %-d %b') }} →</a>{% endif %}</span>
+  </nav>
+
+  <section class="stack">
+    <span class="eyebrow">Day</span>
+    <h1>{{ d.strftime('%A %-d %B') }}</h1>
+  </section>
+
+  <section class="stats" aria-label="This day">
+    <div class="stat"><span class="v">{{ row.parallel_starts }}</span><span class="k">parallel starts</span></div>
+    <div class="stat"><span class="v">{{ '%.1f' % row.mean_concurrency }}</span><span class="k">agents at once, while busy (peak {{ row.peak_concurrency }})</span></div>
+    <div class="stat"><span class="v">{{ duration(row.median_wait_s) }}</span><span class="k">typical wait on you</span></div>
+    <div class="stat"><span class="v">{{ duration(row.longest_stretch_min * 60) }}</span><span class="k">longest focus stretch</span></div>
+  </section>
+
+  <section class="stack">
+    <div class="chart-head">
+      <h3>The day, agent by agent</h3>
+      <div class="legend">
+        <span><i class="k-turn"></i>Agent working</span>
+        <span><i class="k-wait"></i>Waiting for you</span>
+        <span><i class="k-par"></i>Started while another was working</span>
+        {% if row.scene_share %}<span><i class="k-scene"></i>Vibe Nature running</span>{% endif %}
+      </div>
+    </div>
+    <div class="chart">{{ chart }}</div>
+    <p class="muted small">Each row is one agent running at the same time as the others. {{ row.prompts }} prompts across {{ row.sessions }} session{{ '' if row.sessions == 1 else 's' }}, {{ '%.1f' % row.day_length_h }} hours from first to last.</p>
+  </section>
+
+  <section class="stack">
+    <h3>Check-ins</h3>
+    {% if checkins %}
+      <ul class="muted" style="margin:0;padding-left:1.2em">
+      {% for c in checkins %}
+        <li>{{ c.drain }} · {{ labels[c.drain] }}{% if c.trigger == 'end_of_day' %}, at the end of the day{% elif c.trigger == 'long_session' %}, after a long session{% endif %}</li>
+      {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">None this day.</p>
+    {% endif %}
+  </section>
+{% endblock %}

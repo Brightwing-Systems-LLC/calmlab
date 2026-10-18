@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}What CalmLab records · CalmLab{% endblock %}
+{% block main %}
+  <section class="stack">
+    <span class="eyebrow">Privacy</span>
+    <h1>What CalmLab records</h1>
+  </section>
+  <pre class="term" style="white-space:pre-wrap">{{ recorded }}</pre>
+  <section class="stack">
+    <h3>Stopping and erasing</h3>
+    <p class="muted measure">Run these from the CalmLab folder. Uninstall removes only CalmLab's hooks and leaves your other Claude Code settings as they were.</p>
+    <pre class="term">uv run calmlab uninstall   # stop recording, keep the data
+uv run calmlab delete      # erase {{ data_folder }}</pre>
+  </section>
+{% endblock %}

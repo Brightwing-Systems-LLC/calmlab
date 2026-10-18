@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}You vs others · CalmLab{% endblock %}
+{% block main %}
+  <section class="empty">
+    <span class="eyebrow">You vs others</span>
+    <h1>See where you stand among other developers.</h1>
+    <p class="muted measure">Share your daily summaries anonymously and this page shows where you sit: how many agents you run at once, how long they wait on you, how drained you feel, compared with everyone else who shares.</p>
+    <ul class="muted measure" style="margin:0;padding-left:1.2em;display:grid;gap:6px">
+      <li>Only daily summaries are shared, never individual events, and never any text.</li>
+      <li>Nothing is compared until at least 20 people share.</li>
+      <li>Stopping sharing deletes what you sent.</li>
+    </ul>
+    <button class="btn" type="button" disabled>Sharing isn't available yet</button>
+  </section>
+{% endblock %}
