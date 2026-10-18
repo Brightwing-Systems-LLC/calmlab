@@ -68,6 +68,8 @@ def cmd_setup(args) -> int:
         print("Hooks not added. Run ./setup again when you want to start.")
         return 1
     install.install(settings, out=lambda s: print("  " + s))
+    with store.connect() as conn:
+        store.set_meta(conn, "settings_path", str(settings))
     print("\nDone. Claude Code sessions you start from now on are recorded.")
     print("Run ./start to open CalmLab.")
     return 0
@@ -116,7 +118,8 @@ def cmd_status(args) -> int:
         count = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
         checkins = conn.execute("SELECT COUNT(*) FROM checkins").fetchone()[0]
         pending = checkin.pending(conn, time.time())
-    hooked = install.installed(_settings_path(args))
+        used = store.get_meta(conn, "settings_path")
+    hooked = install.installed(Path(used) if used and not args.settings else _settings_path(args))
     s = scene.running()
     print(f"Data folder:  {paths.home()}")
     print(f"Recording:    {'on' if consent and hooked else 'off: run ./setup'}")

@@ -28,6 +28,13 @@ def test_empty_state_says_how_to_start(client, calmlab_home):
     assert "isn't recording yet" in page and "./setup" in page
 
 
+def test_after_setup_the_empty_page_says_go_and_work(client, calmlab_home, tmp_path):
+    from calmlab import cli
+
+    cli.main(["setup", "--yes", "--settings", str(tmp_path / "settings.json")])
+    assert "set up. Go and work." in client.get("/").get_data(as_text=True)
+
+
 def test_pages_render_on_two_weeks_of_data(client, demo):
     home = client.get("/")
     assert home.status_code == 200

@@ -3,7 +3,7 @@
 {% if not has_data %}
   <section class="empty">
     <span class="eyebrow">Nothing recorded yet</span>
-    {% if not consent or not hooked %}
+    {% if not recording %}
       <h1>CalmLab isn't recording yet.</h1>
       <p class="muted measure">Run setup from the CalmLab folder. It shows what is recorded, asks you to agree, and adds the hooks to Claude Code.</p>
       <pre class="term">./setup</pre>

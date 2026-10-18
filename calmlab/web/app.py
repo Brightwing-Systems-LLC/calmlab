@@ -32,7 +32,9 @@ def _load():
         pending = checkin.pending(conn, time.time())
         demo = bool(store.get_meta(conn, "demo"))
         consent = store.get_meta(conn, "consent")
-    return evs, cks, pending, demo, consent
+        settings = store.get_meta(conn, "settings_path")
+    hooked = demo or installed(Path(settings) if settings else DEFAULT_SETTINGS)
+    return evs, cks, pending, demo, bool(consent and hooked)
 
 
 def _offset(evs: list[dict]) -> int:
@@ -61,13 +63,13 @@ def create_app(port: int = 7474) -> Flask:
 
     @app.get("/")
     def you():
-        evs, cks, pending, demo, consent = _load()
+        evs, cks, pending, demo, recording = _load()
         all_days = findings.days(evs, cks)
         today = date.today()
         recording_since = min(all_days) if all_days else None
         return render_template(
             "you.html", tab="you", demo=demo, pending=pending, labels=checkin.DRAIN_LABELS,
-            has_data=bool(evs), hooked=installed(DEFAULT_SETTINGS) or demo, consent=consent,
+            has_data=bool(evs), recording=recording,
             days_recorded=len([d for d in all_days.values() if d.get("turns")]),
             since=recording_since, finding=findings.finding(all_days),
             week=findings.week(all_days, today), chart=charts.daily_bars(all_days, today),
