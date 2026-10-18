@@ -1,6 +1,6 @@
 """A made-up developer, for trying CalmLab before you have data of your own.
 
-`calmlab demo` writes two weeks of one moderate persona into a throwaway data folder and
+`calmlab demo` writes eight weeks of one moderate persona into a throwaway data folder and
 opens the web view on it, with a banner saying it is demo data. Each simulated day is a
 developer juggling Claude Code sessions: reading a finished reply, thinking, sending the
 next prompt, sometimes starting another session while one is still running. Drain
@@ -133,17 +133,22 @@ def _local_ts(day: date, hour: float, offset_min: int) -> float:
     return (local - timedelta(minutes=offset_min) - datetime(1970, 1, 1)).total_seconds()
 
 
-def generate(days: int = 14, end: date | None = None, seed: int = 7) -> tuple[list[dict], list[dict]]:
-    """(events, check-ins) for the `days` days up to yesterday, weekdays only."""
+def generate(days: int = 56, end: date | None = None, seed: int = 7) -> tuple[list[dict], list[dict]]:
+    """(events, check-ins) for the `days` days up to yesterday: weekdays, and the odd
+    short Saturday. Parallel work creeps up over the period, so the trends have a shape."""
     rng = random.Random(seed)
     end = end or date.today() - timedelta(days=1)
     offset = store.local_offset_min()
     events: list[dict] = []
     for i in range(days - 1, -1, -1):
         day = end - timedelta(days=i)
-        if day.weekday() < 5:
-            persona = dict(PERSONA, max_sessions=rng.choice([1, 2, 2, 3]),
-                           spawn=PERSONA["spawn"] * rng.uniform(0.4, 1.4))
+        progress = 1 - i / max(1, days - 1)
+        saturday = day.weekday() == 5 and rng.random() < 0.3
+        if day.weekday() < 5 or saturday:
+            persona = dict(PERSONA, max_sessions=rng.choice([1, 1, 2, 2, 3] if progress > 0.5 else [1, 1, 1, 2, 2, 3]),
+                           spawn=PERSONA["spawn"] * rng.uniform(0.3, 1.0) * (0.6 + 0.6 * progress))
+            if saturday:
+                persona["day_h"] = (1.5, 3.5)
             events.extend(simulate_day(rng, persona, day, offset, scene_on=False))
     checkins = []
     days = metrics.daily(events)
@@ -163,7 +168,7 @@ def generate(days: int = 14, end: date | None = None, seed: int = 7) -> tuple[li
     return events, checkins
 
 
-def load(conn, days: int = 14, end: date | None = None) -> None:
+def load(conn, days: int = 56, end: date | None = None) -> None:
     events, checkins = generate(days, end)
     for e in events:
         store.add_event(conn, store.Event(**e))

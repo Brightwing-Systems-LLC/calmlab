@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Patterns · CalmLab{% endblock %}
+{% block main %}
+{% if not has_data %}
+  <section class="empty">
+    <span class="eyebrow">Patterns</span>
+    <h1>Nothing to see yet.</h1>
+    <p class="muted measure">{% if recording %}Patterns fill in as you work. A few days in, you'll see when you work, how long your agents wait for you, and how many you run at once.{% else %}CalmLab isn't recording yet. Run <code>./setup</code> from the CalmLab folder to start.{% endif %}</p>
+  </section>
+{% else %}
+  <section class="stack">
+    <div class="status">
+      <span class="eyebrow">Patterns</span>
+      <nav class="seg" aria-label="Range">
+        {% for k, (label, _) in ranges.items() %}
+        <a href="?range={{ k }}&x={{ x }}" {% if k == range_key %}aria-current="true"{% endif %}>{{ label }}</a>
+        {% endfor %}
+      </nav>
+    </div>
+    <h1>How you work</h1>
+    <p class="muted">{{ start.strftime('%-d %b') }} to {{ end.strftime('%-d %b %Y') }} · {{ active_days }} day{{ '' if active_days == 1 else 's' }} worked</p>
+  </section>
+
+  {% if grid %}
+  <section class="stack">
+    <div class="chart-head">
+      <h3>When you work</h3>
+      <span class="muted small">Prompts per hour, on average, by weekday.</span>
+    </div>
+    <p class="lede">{{ grid.sentence }}</p>
+    <div class="chart">{{ heatmap }}</div>
+  </section>
+  {% endif %}
+
+  <div class="pair">
+    {% if waits %}
+    <section class="stack">
+      <h3>How long agents wait for you</h3>
+      <p class="lede">{{ waits.sentence }}</p>
+      <div class="chart chart-fit">{{ wait_chart }}</div>
+      <p class="muted small">From the end of each reply to your next prompt in that session, {{ waits.count }} in all. Gaps over two hours count as breaks.</p>
+    </section>
+    {% endif %}
+    {% if busy %}
+    <section class="stack">
+      <h3>How many agents at once</h3>
+      <p class="lede">{{ busy.sentence }}</p>
+      <div class="chart chart-fit">{{ busy_chart }}</div>
+      <p class="muted small">Share of the time any agent was working.</p>
+    </section>
+    {% endif %}
+  </div>
+
+  <section class="stack">
+    <div class="chart-head">
+      <h3>Drain against your days</h3>
+      <nav class="seg seg-sm" aria-label="Compare drain with">
+        {% for k, m in x_metrics.items() %}
+        <a href="?range={{ range_key }}&x={{ k }}" {% if k == x %}aria-current="true"{% endif %}>{{ m[0] }}</a>
+        {% endfor %}
+      </nav>
+    </div>
+    {% if scatter %}
+      {% set s = points.split %}
+      {% if s and (s.high - s.low)|abs >= min_diff %}
+      <p class="lede">On days with {{ xphrase(s.cut) }}, your drain averages <em>{{ '%.1f' % s.high }}</em>. Below that, <em>{{ '%.1f' % s.low }}</em>.</p>
+      {% elif s %}
+      <p class="lede">Days with {{ xphrase(s.cut) }} feel about the same as the rest: drain <em>{{ '%.1f' % s.high }}</em> against <em>{{ '%.1f' % s.low }}</em>.</p>
+      {% endif %}
+      <div class="chart">{{ scatter }}</div>
+      <p class="muted small">One dot per day with a check-in. The shaded side is your higher half of days. A pattern in your days, not proof of a cause.</p>
+    {% else %}
+      <p class="muted">This appears after {{ points.need }} days with a check-in. You have {{ points.points|length }} in this range. Type <code>calm 1</code> to <code>calm 5</code> in Claude Code, any time.</p>
+    {% endif %}
+  </section>
+
+  <section class="stack">
+    <div class="chart-head">
+      <h3>Over time</h3>
+      <span class="legend"><span><i class="k-turn"></i>Each day</span><span><i class="k-avg"></i>Last seven days worked</span></span>
+    </div>
+    <div class="multiples">
+      {% for t in trends %}
+      <div class="multiple">
+        <div class="mhead"><b>{{ t.title }}</b><span class="muted small">{{ t.summary }}</span></div>
+        <div class="chart chart-fit">{{ t.chart }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+{% endblock %}

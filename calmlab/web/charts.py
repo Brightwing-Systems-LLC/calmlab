@@ -9,6 +9,7 @@ which is its hover tooltip.
 from __future__ import annotations
 
 import math
+import statistics
 from datetime import date, timedelta
 from html import escape
 
@@ -178,3 +179,138 @@ def timeline(tl: dict, offset_min: int) -> Markup:
 
 def _par_dot(cx: float, cy: float, tip: str) -> str:
     return f'<circle class="par" cx="{cx:.1f}" cy="{cy - 9:.1f}" r="1.8"><title>{escape(tip)}</title></circle>'
+
+
+def heatmap(grid: dict) -> Markup:
+    """Weekday rows by hour columns, each cell shaded by average prompts in that hour."""
+    hours, rows = grid["hours"], grid["rows"]
+    W, l, r, t, ch, gap = 640, 40, 4, 4, 24, 3
+    cw = (W - l - r) / len(hours)
+    H = t + len(rows) * (ch + gap) + 18
+    vmax = max((c["prompts"] for row in rows for c in row["cells"]), default=0) or 1
+    body = []
+    for i, row in enumerate(rows):
+        y = t + i * (ch + gap)
+        body.append(_text(l - 8, y + ch / 2 + 3.5, row["label"], anchor="end"))
+        for j, c in enumerate(row["cells"]):
+            x = l + j * cw
+            tip = (f"{row['name']} {c['hour']:02d}:00: {c['prompts']:.1f} prompts on average"
+                   + (f", {c['parallel']:.1f} parallel starts" if c["parallel"] >= 0.05 else "")
+                   + f" ({row['days']} day{'' if row['days'] == 1 else 's'})")
+            if c["prompts"] < 0.05:
+                body.append(f'<rect class="cell-empty" x="{x + 1:.1f}" y="{y}" width="{cw - 2:.1f}" height="{ch}" rx="3">'
+                            f'<title>{escape(tip)}</title></rect>')
+            else:
+                body.append(f'<rect class="cell" x="{x + 1:.1f}" y="{y}" width="{cw - 2:.1f}" height="{ch}" rx="3" '
+                            f'fill-opacity="{0.12 + 0.88 * c["prompts"] / vmax:.2f}"><title>{escape(tip)}</title></rect>')
+    for j, h in enumerate(hours):
+        if h % 2 == 0:
+            body.append(_text(l + j * cw + cw / 2, H - 4, f"{h:02d}", anchor="middle"))
+    return _svg(W, H, body, "Average prompts by hour of the day, for each weekday")
+
+
+def share_bars(items: list[dict], label: str) -> Markup:
+    """Horizontal bars for shares of a whole, the biggest drawn full width."""
+    W, l, r, row_h = 400, 96, 40, 30
+    H = len(items) * row_h
+    top = max(i["share"] for i in items) or 1
+    body = []
+    for k, it in enumerate(items):
+        y = k * row_h
+        w = (W - l - r) * it["share"] / top
+        body.append(_text(0, y + row_h / 2 + 4, it["label"], "ax ax-label"))
+        body.append(f'<rect class="track" x="{l}" y="{y + 8}" width="{W - l - r}" height="{row_h - 16}" rx="3"/>')
+        if it["share"] > 0:
+            body.append(f'<rect class="bar" x="{l}" y="{y + 8}" width="{max(2.0, w):.1f}" height="{row_h - 16}" rx="3">'
+                        f'<title>{escape(it["label"])}: {it["share"]:.0%}</title></rect>')
+        body.append(_text(W, y + row_h / 2 + 4, f"{it['share']:.0%}", "ax ax-v", "end"))
+    return _svg(W, H, body, label)
+
+
+def _jitter(key: str) -> float:
+    return (int.from_bytes(key.encode(), "little") * 2654435761 % 1000) / 1000 - 0.5
+
+
+def scatter(data: dict, xlabel: str, fmt, unit: float = 1, tick=str) -> Markup:
+    """Drain against one day measure, one dot a day, with the halves' averages drawn in."""
+    pts = data["points"]
+    W, l, r, t, b = 640, 34, 16, 12, 44
+    H = 280
+    ph, pw = H - t - b, W - l - r
+    top, steps = _ticks(max((p["x"] for p in pts), default=0) * 1.05 / unit or 1)
+    xmax, xticks = top * unit, [v * unit for v in steps]
+
+    def X(v):
+        return l + v / xmax * pw
+
+    def Y(v):
+        return t + (5 - v) / 4 * ph
+
+    body = []
+    for v in range(1, 6):
+        body.append(f'<line class="grid{" grid-base" if v == 1 else ""}" x1="{l}" x2="{W - r}" y1="{Y(v):.1f}" y2="{Y(v):.1f}"/>')
+        body.append(_text(l - 10, Y(v) + 3.5, v, anchor="end"))
+    for i, v in enumerate(xticks):
+        body.append(_text(X(v), H - b + 18, tick(v) if v else "0", anchor="end" if i == len(xticks) - 1 else "middle"))
+    body.append(_text(l + pw / 2, H - 6, xlabel, "ax ax-label", "middle"))
+    split = data["split"]
+    if split:
+        cx = X(split["cut"])
+        body.append(f'<rect class="half" x="{cx:.1f}" y="{t}" width="{W - r - cx:.1f}" height="{ph}"/>')
+        for x1, x2, v, n, side in ((l, cx, split["low"], split["n_low"], "lower"), (cx, W - r, split["high"], split["n_high"], "higher")):
+            tip = f"Your {side} days ({n}): drain {v:.1f} on average"
+            body.append(f'<line class="mean" x1="{x1 + 6:.1f}" x2="{x2 - 6:.1f}" y1="{Y(v):.1f}" y2="{Y(v):.1f}">'
+                        f'<title>{escape(tip)}</title></line>')
+            body.append(_text(x2 - 8, Y(v) - 7, f"avg {v:.1f}", "ax ax-mean", "end"))
+    for p in pts:
+        y = p["y"]
+        if float(y).is_integer():
+            y = min(5, max(1, y + _jitter(p["date"].isoformat()) * 0.22))
+        tip = f"{p['date']:%a %-d %b}: {fmt(p['x'])}, drain {p['y']:.1f}".replace(".0,", ",")
+        body.append(f'<a href="/day/{p["date"].isoformat()}"><circle class="pt" cx="{X(p["x"]):.1f}" cy="{Y(y):.1f}" r="5">'
+                    f'<title>{escape(tip)}</title></circle></a>')
+    return _svg(W, H, body, f"Drain against {xlabel.lower()}, one dot per day")
+
+
+def trend(all_days: dict[date, dict], start: date, end: date, key: str, fmt, ymax_fixed=None,
+          unit: float = 1, tick=str) -> Markup:
+    """A small daily bar chart over the range, with a line for the average of the last seven days worked.
+
+    Ticks are placed in multiples of `unit` (60 turns seconds into whole minutes) and
+    labelled by `tick`."""
+    W, l, r, t, base = 420, 44, 6, 8, 104
+    H = base + 20
+    span = [start + timedelta(days=i) for i in range((end - start).days + 1)]
+    values = [all_days.get(d, {}).get(key) if all_days.get(d, {}).get("turns") else None for d in span]
+    present = [v for v in values if v is not None]
+    if ymax_fixed:
+        ymax, ticks = ymax_fixed, [0, ymax_fixed]
+    else:
+        top, steps = _ticks(max(present, default=0) * 1.08 / unit or 1, most=3)
+        ymax, ticks = top * unit, [v * unit for v in steps]
+    slot = (W - l - r) / len(span)
+    bw = max(1.0, min(14, slot * 0.62))
+
+    def Y(v):
+        return base - v / ymax * (base - t)
+
+    body = []
+    for v in ticks:
+        body.append(f'<line class="grid{" grid-base" if v == 0 else ""}" x1="{l}" x2="{W - r}" y1="{Y(v):.1f}" y2="{Y(v):.1f}"/>')
+        body.append(_text(l - 6, Y(v) + 3.5, tick(v) if v else "0", anchor="end"))
+    recent: list[float] = []
+    line = []
+    for i, (d, v) in enumerate(zip(span, values, strict=True)):
+        if v is None:
+            continue
+        cx = l + slot * i + slot / 2
+        h = max(1.5, v / ymax * (base - t))
+        body.append(f'<a href="/day/{d.isoformat()}"><rect class="bar bar-soft" x="{cx - bw / 2:.1f}" y="{base - h:.1f}" '
+                    f'width="{bw:.1f}" height="{h:.1f}" rx="1.5"><title>{d:%a %-d %b}: {escape(fmt(v))}</title></rect></a>')
+        recent = (recent + [v])[-7:]
+        line.append(f"{cx:.1f},{Y(statistics.fmean(recent)):.1f}")
+    if len(line) > 1:
+        body.append(f'<polyline class="avg" points="{" ".join(line)}"/>')
+    body.append(_text(l, H - 4, f"{start:%-d %b}", "ax"))
+    body.append(_text(W - r, H - 4, f"{end:%-d %b}", "ax", "end"))
+    return _svg(W, H, body, f"{key} per day, with a seven-day average", "viz viz-sm")

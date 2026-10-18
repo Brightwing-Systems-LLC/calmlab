@@ -35,7 +35,7 @@ def test_after_setup_the_empty_page_says_go_and_work(client, calmlab_home, tmp_p
     assert "set up. Go and work." in client.get("/").get_data(as_text=True)
 
 
-def test_pages_render_on_two_weeks_of_data(client, demo):
+def test_pages_render_on_the_demo_data(client, demo):
     home = client.get("/")
     assert home.status_code == 200
     page = home.get_data(as_text=True)
@@ -43,8 +43,24 @@ def test_pages_render_on_two_weeks_of_data(client, demo):
     assert "CalmLab · by Brightwing Systems" in page
     day = re.search(r'href="/day/([0-9-]+)"', page).group(1)
     assert "The day, agent by agent" in client.get(f"/day/{day}").get_data(as_text=True)
-    for path in ("/experiment", "/others", "/about", "/healthz"):
+    for path in ("/patterns", "/experiment", "/others", "/about", "/healthz"):
         assert client.get(path).status_code == 200
+
+
+def test_patterns_renders_every_range_and_measure(client, demo):
+    for rng in ("14", "56", "all", "bogus"):
+        for x in ("parallel_starts", "mean_concurrency", "day_length_h", "longest_stretch_min", "median_wait_s", "bogus"):
+            page = client.get(f"/patterns?range={rng}&x={x}")
+            assert page.status_code == 200
+    page = client.get("/patterns").get_data(as_text=True)
+    for heading in ("When you work", "How long agents wait for you", "How many agents at once",
+                    "Drain against your days", "Over time"):
+        assert heading in page
+    assert page.count("<svg") >= 11
+
+
+def test_patterns_empty_state(client, calmlab_home):
+    assert "Nothing to see yet." in client.get("/patterns").get_data(as_text=True)
 
 
 def test_unknown_or_empty_days_are_404(client, demo):

@@ -23,12 +23,13 @@
       <a class="brand" href="/"><svg aria-hidden="true"><use href="#mark"/></svg><span>Calm<b>Lab</b></span></a>
       <nav class="tabs" aria-label="Sections">
         <a href="/" {% if tab == 'you' %}aria-current="page"{% endif %}>You</a>
+        <a href="/patterns" {% if tab == 'patterns' %}aria-current="page"{% endif %}>Patterns</a>
         <a href="/experiment" {% if tab == 'experiment' %}aria-current="page"{% endif %}>Experiment</a>
         <a href="/others" {% if tab == 'others' %}aria-current="page"{% endif %}>You vs others</a>
       </nav>
     </header>
     {% if demo %}
-    <p class="demo-band">Demo data: a made-up developer's last two weeks. Your own data is not shown or touched. Run <code>./start</code> to see yours.</p>
+    <p class="demo-band">Demo data: a made-up developer's last eight weeks. Your own data is not shown or touched. Run <code>./start</code> to see yours.</p>
     {% endif %}
     <main class="page">
       {% block main %}{% endblock %}

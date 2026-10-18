@@ -17,7 +17,7 @@ Recording doesn't need `./start`. A hook writes to a local database whenever Cla
 fires it; `./start` only opens the view. Sessions already open when you run setup are
 recorded once you restart them.
 
-Want to look first? `uv run calmlab demo` opens the view on two weeks of made-up data and
+Want to look first? `uv run calmlab demo` opens the view on eight weeks of made-up data and
 leaves yours alone.
 
 ## The check-in
@@ -77,6 +77,11 @@ After seven days with a check-in, the home page looks for the one way your days 
 (more parallel starts, longer days, and so on) that lines up best with how drained you
 said you were, and says it in a sentence if the difference is at least half a point. It
 compares your higher days with your lower ones: a pattern, not a cause.
+
+The **Patterns** tab is the longer look, over two weeks, eight weeks or everything: when
+in the day you work, how long your agents wait for you, how many you run at once, drain
+plotted against any of the day measures above, and each measure over time with a
+seven-day average. It is drawn from the same data; nothing extra is recorded for it.
 
 ## Vibe Nature
 

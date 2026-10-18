@@ -14,6 +14,7 @@ Definitions (also in README.md):
 - **longest stretch**: the longest run of activity (events and running turns) with no
   gap of GAP_S or more.
 - **day length**: first to last event of the local day.
+- **busy by level**: seconds with 1, 2, 3, or 4 or more turns running at once.
 """
 
 from __future__ import annotations
@@ -240,6 +241,10 @@ def daily(events: list[dict]) -> dict[date, dict]:
         prompts = [e for e in evs if e["kind"] == "prompt_submit"]
         steps = concurrency_steps(turns)
         peak, mean_conc, multi_share = _concurrency_stats(steps)
+        busy_by_level: dict[int, float] = defaultdict(float)
+        for (t0, level), (t1, _) in itertools.pairwise(steps):
+            if level >= 1:
+                busy_by_level[min(level, 4)] += t1 - t0
         waits = [t.wait_s for t in turns if t.wait_s is not None]
         replies = [t.reply_words for t in turns if t.reply_words is not None]
         reading_wpm = [
@@ -271,6 +276,7 @@ def daily(events: list[dict]) -> dict[date, dict]:
             "peak_concurrency": peak,
             "mean_concurrency": round(mean_conc, 3),
             "multi_busy_share": round(multi_share, 3),
+            "busy_by_level": dict(busy_by_level),
             "reply_words_total": sum(replies),
             "median_reply_words": _median(replies),
             "reading_wpm": _median(reading_wpm),

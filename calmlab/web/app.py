@@ -19,7 +19,7 @@ from pathlib import Path
 
 from flask import Flask, abort, redirect, render_template, request
 
-from .. import __version__, checkin, findings, metrics, paths, scene, store
+from .. import __version__, checkin, findings, metrics, paths, patterns, scene, store
 from ..cli import WHAT_IS_RECORDED
 from ..install import DEFAULT_SETTINGS, installed
 from . import charts
@@ -75,6 +75,37 @@ def create_app(port: int = 7474) -> Flask:
             week=findings.week(all_days, today), chart=charts.daily_bars(all_days, today),
             recent=[(d, row) for d, row in sorted(all_days.items(), reverse=True) if row.get("turns")][:14],
             duration=findings.duration, delta=findings.delta,
+        )
+
+    @app.get("/patterns")
+    def patterns_page():
+        evs, cks, _, demo, recording = _load()
+        all_days = findings.days(evs, cks)
+        key = request.args.get("range", patterns.DEFAULT_RANGE)
+        key = key if key in patterns.RANGES else patterns.DEFAULT_RANGE
+        start, end, rows = patterns.window(all_days, date.today(), key)
+        found = findings.finding(all_days)
+        x = request.args.get("x") or (found.get("metric") if found.get("found") else None)
+        x = x if x in patterns.X_METRICS else "parallel_starts"
+        grid = patterns.hour_grid(rows)
+        waits = patterns.wait_bins(rows)
+        busy = patterns.concurrency(rows)
+        points = patterns.scatter(rows, x)
+        _, xlabel, xfmt, xphrase, xunit, xtick = patterns.X_METRICS[x]
+        trends = [
+            {"title": title, "summary": patterns.trend_summary(rows, k),
+             "chart": charts.trend(all_days, start, end, k, fmt, top, unit, tick)}
+            for k, (title, fmt, top, unit, tick) in patterns.TRENDS.items()
+        ]
+        return render_template(
+            "patterns.html", tab="patterns", demo=demo, recording=recording, has_data=bool(evs),
+            ranges=patterns.RANGES, range_key=key, start=start, end=end,
+            active_days=sum(1 for r in rows.values() if r.get("turns")),
+            x=x, x_metrics=patterns.X_METRICS, grid=grid, heatmap=charts.heatmap(grid) if grid else "",
+            waits=waits, wait_chart=charts.share_bars(waits["bins"], "How long your agents wait for you") if waits else "",
+            busy=busy, busy_chart=charts.share_bars(busy["bars"], "How many agents you have running at once") if busy else "",
+            points=points, scatter=charts.scatter(points, xlabel, xfmt, xunit, xtick) if len(points["points"]) >= points["need"] else "",
+            xphrase=lambda v: xphrase.format(xfmt(v)), min_diff=findings.MIN_DIFF, trends=trends,
         )
 
     @app.get("/day/<iso>")
